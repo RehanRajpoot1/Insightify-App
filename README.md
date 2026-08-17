@@ -55,3 +55,4 @@ If you don't want Docker, run each piece separately — see the README inside ea
 | Database | PostgreSQL |
 | Auth | JWT (jsonwebtoken + bcryptjs) |
 | Bulk import/export | papaparse, xlsx (SheetJS) |
+test change
