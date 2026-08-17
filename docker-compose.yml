@@ -1,0 +1,55 @@
+# DEVELOPMENT environment — for building/testing new features.
+# Runs Next.js in dev mode (hot reload) on ports 3000/4000, with its own database.
+# For real users, use the separate production environment instead:
+#   docker compose -f docker-compose.prod.yml up --build -d
+#
+# Usage (dev):
+#   docker compose up --build -d
+#   docker compose down
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: roster
+    ports:
+      - '5432:5432'
+    volumes:
+      - roster_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/roster?schema=public
+      JWT_SECRET: change-this-to-a-long-random-string
+      JWT_EXPIRES_IN: 7d
+      PORT: 4000
+      CORS_ORIGIN: http://192.168.2.60:3000
+    ports:
+      - '4000:4000'
+      - '5555:5555'
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE: http://192.168.2.60:4000
+    ports:
+      - '3000:3000'
+
+volumes:
+  roster_pgdata:

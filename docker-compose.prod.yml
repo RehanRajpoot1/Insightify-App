@@ -1,0 +1,60 @@
+# PRODUCTION environment — for real users.
+# Runs on different ports and a separate database from the dev environment,
+# so both can run side by side on the same VM without colliding.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up --build -d
+#   docker compose -f docker-compose.prod.yml down
+#
+# IMPORTANT before going live:
+#   1. Change POSTGRES_PASSWORD below (and update DATABASE_URL to match).
+#   2. Change JWT_SECRET to a long random string (different from dev).
+#   3. Update CORS_ORIGIN / NEXT_PUBLIC_API_BASE to your real domain or VM IP.
+
+services:
+  postgres_prod:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change-this-prod-db-password
+      POSTGRES_DB: roster_prod
+    ports:
+      - '5433:5432'
+    volumes:
+      - roster_pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend_prod:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres_prod:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:change-this-prod-db-password@postgres_prod:5432/roster_prod?schema=public
+      JWT_SECRET: change-this-to-a-different-long-random-string-for-prod
+      JWT_EXPIRES_IN: 7d
+      PORT: 4000
+      CORS_ORIGIN: http://192.168.2.60:3001
+    ports:
+      - '4001:4000'
+
+  frontend_prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_BASE: http://192.168.2.60:4001
+    restart: unless-stopped
+    depends_on:
+      - backend_prod
+    ports:
+      - '3001:3000'
+
+volumes:
+  roster_pgdata_prod:

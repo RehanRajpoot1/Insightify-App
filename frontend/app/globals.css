@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-alt: #EEF0F3;
+  --border: #E1E4EA;
+  --text: #171A21;
+  --text-muted: #6B7280;
+  --accent: #3452FF;
+  --accent-soft: #E8ECFF;
+  --success: #17A673;
+  --success-soft: #E4F6EF;
+  --warning: #E8A83C;
+  --warning-soft: #FBF1E1;
+  --danger: #E5484D;
+}
+
+.dark {
+  --bg: #12151B;
+  --surface: #1B1F27;
+  --surface-alt: #222732;
+  --border: #2B303C;
+  --text: #E7E9EE;
+  --text-muted: #8B93A3;
+  --accent: #6B84FF;
+  --accent-soft: #1E2645;
+  --success: #2FCB93;
+  --success-soft: #17301F;
+  --warning: #F0BC5E;
+  --warning-soft: #332A15;
+  --danger: #F17579;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
+}

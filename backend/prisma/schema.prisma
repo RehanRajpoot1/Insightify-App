@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  team_lead
+  agent
+}
+
+enum UserStatus {
+  active
+  inactive
+  leave
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  tag         String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  teams Team[]
+
+  @@map("campaigns")
+}
+
+model Team {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  name       String
+  teamLeadId String?  @unique @map("team_lead_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  teamLead User?    @relation("TeamLead", fields: [teamLeadId], references: [id], onDelete: SetNull)
+  agents   User[]   @relation("TeamMembers")
+  dailyReports DailyReport[]
+  roles        Role[]
+
+  @@unique([campaignId, name])
+  @@map("teams")
+}
+
+model User {
+  id           String     @id @default(uuid())
+  fullName     String     @map("full_name")
+  crmName      String     @map("crm_name")
+  email        String     @unique
+  phone        String?
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(agent)
+  status       UserStatus @default(active)
+  teamId       String?    @map("team_id")
+  customRoleId String?    @map("custom_role_id")
+  dateJoined   DateTime   @default(now()) @map("date_joined")
+  avatarUrl    String?    @map("avatar_url")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  team        Team?  @relation("TeamMembers", fields: [teamId], references: [id], onDelete: SetNull)
+  leadOfTeam  Team?  @relation("TeamLead")
+  customRole  Role?  @relation("UserCustomRole", fields: [customRoleId], references: [id], onDelete: SetNull)
+  createdRoles  Role[]          @relation("RoleCreator")
+  importBatches ImportBatch[]
+  dailyReportRows DailyReportRow[]
+
+  @@index([teamId])
+  @@index([role])
+  @@index([status])
+  @@index([customRoleId])
+  @@map("users")
+}
+
+enum RoleScope {
+  global
+  team
+}
+
+// A custom permission set. Admins create "global" roles anyone can be assigned.
+// Team leads can create "team" roles (locked to their own team) to delegate a
+// limited, non-escalatable subset of their own permissions to their agents.
+model Role {
+  id          String    @id @default(uuid())
+  name        String
+  scope       RoleScope @default(team)
+  teamId      String?   @map("team_id")
+  permissions Json // array of permission keys, e.g. ["reports.edit_all","agents.view"]
+  createdById String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  team      Team?  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("RoleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  users     User[] @relation("UserCustomRole")
+
+  @@map("roles")
+}
+
+model ImportBatch {
+  id           String   @id @default(uuid())
+  uploadedById String?  @map("uploaded_by")
+  fileName     String?  @map("file_name")
+  totalRows    Int      @map("total_rows")
+  successRows  Int      @map("success_rows")
+  failedRows   Int      @map("failed_rows")
+  errorLog     Json?    @map("error_log")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@map("import_batches")
+}
+
+// Mirrors the "Team Daily Report" spreadsheet: one report per team per calendar
+// date, containing one row per agent with hourly FTD/Fresh-Lead entries.
+model DailyReport {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  teamId    String   @map("team_id")
+  hourCount Int      @default(8) @map("hour_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  team Team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  rows DailyReportRow[]
+
+  @@unique([date, teamId])
+  @@map("daily_reports")
+}
+
+model DailyReportRow {
+  id                String   @id @default(uuid())
+  reportId          String   @map("report_id")
+  agentId           String?  @map("agent_id")
+  agentName         String   @map("agent_name")
+  hours             Json // [{ ftds: number, freshLead: number }, ...]
+  totalLeadsFintana Int      @default(0) @map("total_leads_fintana")
+  totalLeadsSpova   Int      @default(0) @map("total_leads_spova")
+  reason            String   @default("")
+  campaign          String   @default("")
+  position          Int      @default(0)
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  agent  User?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([reportId])
+  @@index([agentId])
+  @@map("daily_report_rows")
+}
