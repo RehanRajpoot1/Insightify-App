@@ -16,6 +16,7 @@ router.post('/crm-name-suggest', requirePermission('agents.create'), agents.sugg
 router.post('/bulk-import', requireRole('admin'), upload.single('file'), bulkImport.previewImport);
 router.post('/bulk-import/confirm', requireRole('admin'), bulkImport.confirmImport);
 router.patch('/bulk-reassign', requireRole('admin'), agents.bulkReassign);
+router.delete('/bulk', requirePermission('agents.delete'), agents.bulkDeleteAgents);
 router.get('/export', requireRole('admin', 'team_lead'), exportAgents);
 
 router.get('/', agents.listAgents);

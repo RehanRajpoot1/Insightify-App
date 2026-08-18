@@ -3,16 +3,20 @@
 import { useState } from 'react';
 import { createAgent, suggestCrmName } from '../lib/api';
 
-function emailSlug(name) {
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z\s]/g, '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('.');
-  return base || 'agent';
+const SKIP_WORDS = ['syed', 'syeda', 'muhammad', 'mohammad', 'mian', 'mst'];
+
+// Mirrors the backend's CRM-name pattern (e.g. "Abdul Raheem Butt" -> "raheem.ab")
+// so bulk-created emails look consistent: firstname.xx@Insightify.com
+function emailSlug(fullName) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  let firstIdx = parts.findIndex((p) => !SKIP_WORDS.includes(p.toLowerCase()));
+  if (firstIdx === -1) firstIdx = 0;
+
+  const firstName = (parts[firstIdx] || 'agent').toLowerCase().replace(/[^a-z]/g, '');
+  const lastPart = parts[parts.length - 1] || '';
+  const suffix = lastPart.toLowerCase().replace(/[^a-z]/g, '').slice(0, 2);
+
+  return suffix ? `${firstName}.${suffix}` : firstName;
 }
 
 export default function BulkAddAgentModal({ teamId, onClose, onDone }) {
@@ -31,21 +35,29 @@ export default function BulkAddAgentModal({ teamId, onClose, onDone }) {
     setSubmitting(true);
     const out = [];
     for (const name of names) {
-      const email = `${emailSlug(name)}.${Math.random().toString(36).slice(2, 6)}@insightify.local`;
-      try {
-        const crmName = await suggestCrmName(name).catch(() => undefined);
-        await createAgent({
-          fullName: name,
-          crmName,
-          email,
-          teamId,
-          role: 'agent',
-          password,
-        });
-        out.push({ name, status: 'ok', email });
-      } catch (err) {
-        out.push({ name, status: 'error', message: err.message });
+      const base = emailSlug(name);
+      let attempt = 0;
+      let lastError = null;
+      let created = false;
+
+      // Try the clean "firstname.xx@Insightify.com" first; only add a number
+      // if that exact email is already taken by someone else.
+      while (attempt < 20 && !created) {
+        const email = attempt === 0 ? `${base}@Insightify.com` : `${base}${attempt + 1}@Insightify.com`;
+        try {
+          const crmName = await suggestCrmName(name).catch(() => undefined);
+          await createAgent({ fullName: name, crmName, email, teamId, role: 'agent', password });
+          out.push({ name, status: 'ok', email });
+          created = true;
+        } catch (err) {
+          lastError = err;
+          const isDuplicate = /already in use|already exists/i.test(err.message || '');
+          if (!isDuplicate) break; // a real error (not a collision) — stop retrying
+          attempt += 1;
+        }
       }
+
+      if (!created) out.push({ name, status: 'error', message: lastError?.message || 'Failed to create' });
       setResults([...out]);
     }
     setSubmitting(false);

@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+require('express-async-errors'); // must load before routes — makes thrown/rejected errors in async handlers reach the error middleware
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');

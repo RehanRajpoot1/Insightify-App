@@ -145,6 +145,11 @@ export async function deactivateAgent(id) {
   return data.agent;
 }
 
+export async function bulkDeleteAgents(ids) {
+  const data = await request('/api/agents/bulk', { method: 'DELETE', body: { ids } });
+  return data.deleted;
+}
+
 export async function reassignAgent(agentId, teamId) {
   const data = await request(`/api/agents/${agentId}/reassign`, {
     method: 'PATCH',

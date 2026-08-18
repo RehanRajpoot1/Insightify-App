@@ -91,12 +91,20 @@ async function createAgent(req, res) {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const agent = await prisma.user.create({
-    data: {
-      fullName, crmName: finalCrmName, email, phone, teamId, role, passwordHash,
-      customRoleId: roleCheck.value,
-    },
-  });
+  let agent;
+  try {
+    agent = await prisma.user.create({
+      data: {
+        fullName, crmName: finalCrmName, email, phone, teamId, role, passwordHash,
+        customRoleId: roleCheck.value,
+      },
+    });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'That email is already in use' });
+    }
+    throw err;
+  }
 
   res.status(201).json({
     agent: { id: agent.id, fullName: agent.fullName, crmName: agent.crmName, email: agent.email },
@@ -141,6 +149,23 @@ async function deleteAgent(req, res) {
   res.json({ agent });
 }
 
+// DELETE /api/agents/bulk — permanently delete one or more accounts.
+// Refuses to delete your own account (prevents accidental admin lockout).
+async function bulkDeleteAgents(req, res) {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids (array) is required' });
+  }
+
+  const targetIds = ids.filter((id) => id !== req.user.id);
+  if (targetIds.length === 0) {
+    return res.status(400).json({ error: 'No valid users to delete (cannot delete your own account)' });
+  }
+
+  const result = await prisma.user.deleteMany({ where: { id: { in: targetIds } } });
+  res.json({ deleted: result.count });
+}
+
 async function reassignAgent(req, res) {
   const { id } = req.params;
   const { team_id } = req.body;
@@ -168,6 +193,6 @@ async function bulkReassign(req, res) {
 }
 
 module.exports = {
-  listAgents, getAgent, createAgent, updateAgent, deleteAgent,
+  listAgents, getAgent, createAgent, updateAgent, deleteAgent, bulkDeleteAgents,
   reassignAgent, bulkReassign, suggestCrmName,
 };
