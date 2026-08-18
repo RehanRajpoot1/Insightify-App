@@ -123,11 +123,21 @@ model ImportBatch {
 
 // Mirrors the "Team Daily Report" spreadsheet: one report per team per calendar
 // date, containing one row per agent with hourly FTD/Fresh-Lead entries.
+enum CallTarget {
+  on_target
+  underperforming
+  critical
+}
+
+enum Attendance {
+  present
+  absent
+}
+
 model DailyReport {
   id        String   @id @default(uuid())
   date      DateTime @db.Date
   teamId    String   @map("team_id")
-  hourCount Int      @default(8) @map("hour_count")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -139,16 +149,18 @@ model DailyReport {
 }
 
 model DailyReportRow {
-  id                String   @id @default(uuid())
-  reportId          String   @map("report_id")
-  agentId           String?  @map("agent_id")
-  agentName         String   @map("agent_name")
-  hours             Json // [{ ftds: number, freshLead: number }, ...]
-  totalLeadsFintana Int      @default(0) @map("total_leads_fintana")
-  totalLeadsSpova   Int      @default(0) @map("total_leads_spova")
-  reason            String   @default("")
-  campaign          String   @default("")
-  position          Int      @default(0)
+  id                String     @id @default(uuid())
+  reportId          String     @map("report_id")
+  agentId           String?    @map("agent_id")
+  agentName         String     @map("agent_name")
+  totalFtds         Int        @default(0) @map("total_ftds")
+  totalLeadsFintana Int        @default(0) @map("total_leads_fintana")
+  totalLeadsSpova   Int        @default(0) @map("total_leads_spova")
+  reason            String     @default("")
+  campaign          String     @default("")
+  callTarget        CallTarget @default(on_target) @map("call_target")
+  attendance        Attendance @default(present)
+  position          Int        @default(0)
 
   report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   agent  User?       @relation(fields: [agentId], references: [id], onDelete: SetNull)

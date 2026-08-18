@@ -37,6 +37,22 @@ export function roleLabel(role) {
   return 'Agent';
 }
 
+export function callTargetMeta(value) {
+  switch (value) {
+    case 'underperforming':
+      return { label: 'Underperforming', badge: 'bg-warning-soft text-warning' };
+    case 'critical':
+      return { label: 'Critical', badge: 'bg-danger text-white' };
+    default:
+      return { label: 'On Target', badge: 'bg-success-soft text-success' };
+  }
+}
+
+export function attendanceMeta(value) {
+  if (value === 'absent') return { label: 'Absent', badge: 'bg-danger text-white' };
+  return { label: 'Present', badge: 'bg-success-soft text-success' };
+}
+
 // Matches an agent (camelCase fields from the API: fullName, crmName) against
 // the current search query and status filter.
 export function agentMatchesFilters(agent, teamName, query, statusFilter) {

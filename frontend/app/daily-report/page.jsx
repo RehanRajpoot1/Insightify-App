@@ -26,19 +26,15 @@ function emptyRow(overrides = {}) {
     id: `new-${Math.random().toString(36).slice(2)}`,
     agentId: null,
     agentName: '',
-    hours: [],
+    totalFtds: 0,
     totalLeadsFintana: 0,
     totalLeadsSpova: 0,
     reason: '',
     campaign: '',
+    callTarget: 'on_target',
+    attendance: 'present',
     ...overrides,
   };
-}
-
-function padHours(hours, count) {
-  const next = [...hours];
-  while (next.length < count) next.push({ ftds: 0, freshLead: 0 });
-  return next.slice(0, count);
 }
 
 export default function DailyReportPage() {
@@ -47,7 +43,6 @@ export default function DailyReportPage() {
   const isManager = user?.role === 'admin' || user?.role === 'team_lead';
 
   const [date, setDate] = useState(todayStr());
-  const [hourCount, setHourCount] = useState(8);
   const [reportId, setReportId] = useState(null);
   const [rows, setRows] = useState([]);
   const [recentDates, setRecentDates] = useState([]);
@@ -103,22 +98,22 @@ export default function DailyReportPage() {
       .then((report) => {
         if (report) {
           setReportId(report.id);
-          setHourCount(report.hourCount);
           setRows(
             report.rows.map((r) => ({
               id: r.id,
               agentId: r.agentId,
               agentName: r.agentName,
-              hours: padHours(r.hours || [], report.hourCount),
+              totalFtds: r.totalFtds,
               totalLeadsFintana: r.totalLeadsFintana,
               totalLeadsSpova: r.totalLeadsSpova,
               reason: r.reason,
               campaign: r.campaign,
+              callTarget: r.callTarget,
+              attendance: r.attendance,
             }))
           );
         } else {
           setReportId(null);
-          setHourCount(8);
           setRows([]);
         }
       })
@@ -139,14 +134,11 @@ export default function DailyReportPage() {
   }
 
   function addRow() {
-    setRows((prev) => [...prev, emptyRow({ hours: padHours([], hourCount) })]);
+    setRows((prev) => [...prev, emptyRow()]);
   }
 
   function bulkAddRows(names) {
-    setRows((prev) => [
-      ...prev,
-      ...names.map((name) => emptyRow({ agentName: name, hours: padHours([], hourCount) })),
-    ]);
+    setRows((prev) => [...prev, ...names.map((name) => emptyRow({ agentName: name }))]);
     setShowBulkAdd(false);
   }
 
@@ -154,20 +146,9 @@ export default function DailyReportPage() {
     setRows((prev) => {
       const existingIds = new Set(prev.map((r) => r.agentId).filter(Boolean));
       const toAdd = agents.filter((a) => !existingIds.has(a.id));
-      return [
-        ...prev,
-        ...toAdd.map((a) =>
-          emptyRow({ agentId: a.id, agentName: a.fullName, hours: padHours([], hourCount) })
-        ),
-      ];
+      return [...prev, ...toAdd.map((a) => emptyRow({ agentId: a.id, agentName: a.fullName }))];
     });
     setShowRosterPicker(false);
-  }
-
-  function changeHourCount(newCount) {
-    const n = Math.max(1, Math.min(24, Number(newCount) || 1));
-    setHourCount(n);
-    setRows((prev) => prev.map((r) => ({ ...r, hours: padHours(r.hours, n) })));
   }
 
   async function handleSave() {
@@ -178,15 +159,16 @@ export default function DailyReportPage() {
       const saved = await saveDailyReport({
         date,
         team_id: teamId,
-        hourCount,
         rows: rows.map((r) => ({
           agentId: r.agentId,
           agentName: r.agentName,
-          hours: r.hours,
+          totalFtds: r.totalFtds,
           totalLeadsFintana: r.totalLeadsFintana,
           totalLeadsSpova: r.totalLeadsSpova,
           reason: r.reason,
           campaign: r.campaign,
+          callTarget: r.callTarget,
+          attendance: r.attendance,
         })),
       });
       setReportId(saved.id);
@@ -208,11 +190,13 @@ export default function DailyReportPage() {
     setSavedMsg('');
     try {
       await updateDailyReportRow(reportId, myRow.id, {
-        hours: myRow.hours,
+        totalFtds: myRow.totalFtds,
         totalLeadsFintana: myRow.totalLeadsFintana,
         totalLeadsSpova: myRow.totalLeadsSpova,
         reason: myRow.reason,
         campaign: myRow.campaign,
+        callTarget: myRow.callTarget,
+        attendance: myRow.attendance,
       });
       setSavedMsg('Saved ✓');
       setTimeout(() => setSavedMsg(''), 2500);
@@ -245,9 +229,9 @@ export default function DailyReportPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface flex-wrap gap-3">
           <div>
-            <h1 className="font-bold text-[17px] tracking-tight">Team Daily Report</h1>
+            <h1 className="font-bold text-[17px] tracking-tight">Daily Report</h1>
             <p className="text-[12.5px] text-muted">
-              {isManager ? 'Enter numbers per hour — totals calculate automatically.' : 'You can only edit your own row.'}
+              {isManager ? 'Enter each agent\'s totals for the day — Total Leads calculates automatically.' : 'You can only edit your own row.'}
             </p>
           </div>
 
@@ -276,24 +260,13 @@ export default function DailyReportPage() {
               className="px-2.5 py-1.5 bg-surface-alt border border-transparent rounded-lg text-[13px] focus:outline-none focus:border-accent"
             />
             {isManager && (
-              <>
-                <label className="text-[12.5px] text-muted font-medium ml-2">Hours</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={hourCount}
-                  onChange={(e) => changeHourCount(e.target.value)}
-                  className="w-16 px-2.5 py-1.5 bg-surface-alt border border-transparent rounded-lg text-[13px] focus:outline-none focus:border-accent"
-                />
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="ml-2 bg-accent text-white px-3.5 py-2 rounded-lg font-semibold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
-                >
-                  {saving ? 'Saving…' : 'Save report'}
-                </button>
-              </>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="ml-2 bg-accent text-white px-3.5 py-2 rounded-lg font-semibold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
+              >
+                {saving ? 'Saving…' : 'Save report'}
+              </button>
             )}
             {!isManager && myRow && (
               <button
@@ -347,7 +320,6 @@ export default function DailyReportPage() {
           ) : (
             <>
               <DailyReportTable
-                hourCount={hourCount}
                 rows={rows}
                 onChangeRow={updateRow}
                 onRemoveRow={removeRow}

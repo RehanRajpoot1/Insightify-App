@@ -51,7 +51,7 @@ async function listReportDates(req, res) {
 
 // PUT /api/daily-reports — upsert the whole report (admin + team_lead only, own team)
 async function saveReport(req, res) {
-  const { date: rawDate, hourCount, rows, team_id } = req.body;
+  const { date: rawDate, rows, team_id } = req.body;
   const date = toDateOnly(rawDate);
   if (!date) return res.status(400).json({ error: 'Valid date is required' });
   if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows must be an array' });
@@ -65,8 +65,8 @@ async function saveReport(req, res) {
   const result = await prisma.$transaction(async (tx) => {
     const report = await tx.dailyReport.upsert({
       where: { date_teamId: { date, teamId } },
-      update: { hourCount: hourCount || 8 },
-      create: { date, teamId, hourCount: hourCount || 8 },
+      update: {},
+      create: { date, teamId },
     });
 
     await tx.dailyReportRow.deleteMany({ where: { reportId: report.id } });
@@ -77,11 +77,15 @@ async function saveReport(req, res) {
           reportId: report.id,
           agentId: row.agentId || null,
           agentName: row.agentName || '',
-          hours: row.hours || [],
+          totalFtds: Number(row.totalFtds) || 0,
           totalLeadsFintana: Number(row.totalLeadsFintana) || 0,
           totalLeadsSpova: Number(row.totalLeadsSpova) || 0,
           reason: row.reason || '',
           campaign: row.campaign || '',
+          callTarget: ['on_target', 'underperforming', 'critical'].includes(row.callTarget)
+            ? row.callTarget
+            : 'on_target',
+          attendance: ['present', 'absent'].includes(row.attendance) ? row.attendance : 'present',
           position: idx,
         })),
       });
@@ -101,7 +105,7 @@ async function saveReport(req, res) {
 // for a quick single-row edit (they already have full access via saveReport).
 async function updateOwnRow(req, res) {
   const { reportId, rowId } = req.params;
-  const { hours, totalLeadsFintana, totalLeadsSpova, reason, campaign } = req.body;
+  const { totalFtds, totalLeadsFintana, totalLeadsSpova, reason, campaign, callTarget, attendance } = req.body;
 
   const row = await prisma.dailyReportRow.findUnique({
     where: { id: rowId },
@@ -117,16 +121,21 @@ async function updateOwnRow(req, res) {
     return res.status(403).json({ error: 'Forbidden — you can only edit your own row' });
   }
 
-  const updated = await prisma.dailyReportRow.update({
-    where: { id: rowId },
-    data: {
-      hours: hours !== undefined ? hours : undefined,
-      totalLeadsFintana: totalLeadsFintana !== undefined ? Number(totalLeadsFintana) || 0 : undefined,
-      totalLeadsSpova: totalLeadsSpova !== undefined ? Number(totalLeadsSpova) || 0 : undefined,
-      reason: reason !== undefined ? reason : undefined,
-      campaign: campaign !== undefined ? campaign : undefined,
-    },
-  });
+  const data = {
+    totalFtds: totalFtds !== undefined ? Number(totalFtds) || 0 : undefined,
+    totalLeadsFintana: totalLeadsFintana !== undefined ? Number(totalLeadsFintana) || 0 : undefined,
+    totalLeadsSpova: totalLeadsSpova !== undefined ? Number(totalLeadsSpova) || 0 : undefined,
+    reason: reason !== undefined ? reason : undefined,
+    campaign: campaign !== undefined ? campaign : undefined,
+  };
+  if (callTarget !== undefined && ['on_target', 'underperforming', 'critical'].includes(callTarget)) {
+    data.callTarget = callTarget;
+  }
+  if (attendance !== undefined && ['present', 'absent'].includes(attendance)) {
+    data.attendance = attendance;
+  }
+
+  const updated = await prisma.dailyReportRow.update({ where: { id: rowId }, data });
 
   res.json({ row: updated });
 }
