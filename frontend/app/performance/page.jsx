@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '../../components/Sidebar';
 import { useAuth } from '../../lib/auth-context';
 import { fetchAllTeams, fetchReportSummary, ApiError } from '../../lib/api';
+import { exportPerformanceSummaryPdf } from '../../lib/pdfExport';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -59,6 +60,11 @@ export default function PerformancePage() {
       .then(setResult)
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Failed to load summary'))
       .finally(() => setLoading(false));
+  }
+
+  function handleDownloadPdf() {
+    if (!result) return;
+    exportPerformanceSummaryPdf({ teamName: selectedTeamName, from, to, agents: result.agents, totals: result.totals });
   }
 
   if (authLoading || !user || user.role === 'agent') {
@@ -155,9 +161,18 @@ export default function PerformancePage() {
 
           {result && (
             <>
-              <p className="text-[12.5px] text-muted mb-3">
-                {result.reportCount} day(s) of reports found for {selectedTeamName || 'this team'} between {from} and {to}.
-              </p>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <p className="text-[12.5px] text-muted">
+                  {result.reportCount} day(s) of reports found for {selectedTeamName || 'this team'} between {from} and {to}.
+                </p>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={result.agents.length === 0}
+                  className="px-3.5 py-2 rounded-lg border border-border text-[13px] font-semibold hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+                >
+                  Download report
+                </button>
+              </div>
               <table className="w-full border-collapse bg-surface border border-border rounded-lg overflow-hidden shadow-card">
                 <thead>
                   <tr>

@@ -7,7 +7,7 @@ import DailyReportTable from '../../components/DailyReportTable';
 import BulkAddModal from '../../components/BulkAddModal';
 import AddFromRosterModal from '../../components/AddFromRosterModal';
 import { useAuth } from '../../lib/auth-context';
-import { exportDailyReportPdf } from '../../lib/pdfExport';
+import { exportDailyReportFullPdf } from '../../lib/pdfExport';
 import {
   fetchDailyReport,
   fetchDailyReportDates,
@@ -183,7 +183,7 @@ export default function DailyReportPage() {
   const teamName = allTeams.find((t) => t.id === teamId)?.name || '';
 
   function handleDownloadPdf() {
-    exportDailyReportPdf({ teamName, date, rows });
+    exportDailyReportFullPdf({ teamName, date, rows });
   }
 
   async function handleSaveMyRow() {
