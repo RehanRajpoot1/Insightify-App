@@ -15,6 +15,12 @@ export default function AddFromRosterModal({ agents, onClose, onConfirm }) {
     });
   }
 
+  const allSelected = agents.length > 0 && selected.size === agents.length;
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(agents.map((a) => a.id)));
+  }
+
   function handleConfirm() {
     const chosen = agents.filter((a) => selected.has(a.id));
     if (chosen.length === 0) return;
@@ -33,6 +39,13 @@ export default function AddFromRosterModal({ agents, onClose, onConfirm }) {
             ×
           </button>
         </div>
+
+        {agents.length > 0 && (
+          <label className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-surface-alt cursor-pointer border-b border-border mb-1">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+            <span className="text-[13px] font-semibold text-muted">Select all</span>
+          </label>
+        )}
 
         <div className="max-h-72 overflow-y-auto flex flex-col gap-1 -mx-1 px-1">
           {agents.map((a) => (
