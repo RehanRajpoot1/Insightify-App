@@ -140,4 +140,56 @@ async function updateOwnRow(req, res) {
   res.json({ row: updated });
 }
 
-module.exports = { getReportByDate, listReportDates, saveReport, updateOwnRow };
+// GET /api/daily-reports/summary?team_id=...&from=YYYY-MM-DD&to=YYYY-MM-DD
+// Aggregates FTDs / Fintana / Spova per agent across a date range (kept separate, never merged).
+async function getReportSummary(req, res) {
+  const from = toDateOnly(req.query.from);
+  const to = toDateOnly(req.query.to);
+  if (!from || !to) return res.status(400).json({ error: 'Valid from and to dates are required' });
+
+  const teamId = resolveTeamId(req, req.query.team_id);
+  if (!teamId) return res.status(400).json({ error: 'team_id is required' });
+  if (req.user.role !== 'admin' && teamId !== req.user.teamId) {
+    return res.status(403).json({ error: 'Forbidden — not your team' });
+  }
+
+  const reports = await prisma.dailyReport.findMany({
+    where: { teamId, date: { gte: from, lte: to } },
+    include: { rows: true },
+  });
+
+  const byAgent = new Map();
+  for (const report of reports) {
+    for (const row of report.rows) {
+      const key = row.agentId || `name:${row.agentName}`;
+      if (!byAgent.has(key)) {
+        byAgent.set(key, {
+          agentId: row.agentId,
+          agentName: row.agentName,
+          totalFtds: 0,
+          totalLeadsFintana: 0,
+          totalLeadsSpova: 0,
+        });
+      }
+      const entry = byAgent.get(key);
+      entry.totalFtds += row.totalFtds;
+      entry.totalLeadsFintana += row.totalLeadsFintana;
+      entry.totalLeadsSpova += row.totalLeadsSpova;
+      entry.agentName = row.agentName; // keep the most recent name
+    }
+  }
+
+  const agents = [...byAgent.values()].sort((a, b) => a.agentName.localeCompare(b.agentName));
+  const totals = agents.reduce(
+    (acc, a) => ({
+      totalFtds: acc.totalFtds + a.totalFtds,
+      totalLeadsFintana: acc.totalLeadsFintana + a.totalLeadsFintana,
+      totalLeadsSpova: acc.totalLeadsSpova + a.totalLeadsSpova,
+    }),
+    { totalFtds: 0, totalLeadsFintana: 0, totalLeadsSpova: 0 }
+  );
+
+  res.json({ agents, totals, reportCount: reports.length });
+}
+
+module.exports = { getReportByDate, listReportDates, saveReport, updateOwnRow, getReportSummary };

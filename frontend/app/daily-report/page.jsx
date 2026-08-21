@@ -7,6 +7,7 @@ import DailyReportTable from '../../components/DailyReportTable';
 import BulkAddModal from '../../components/BulkAddModal';
 import AddFromRosterModal from '../../components/AddFromRosterModal';
 import { useAuth } from '../../lib/auth-context';
+import { exportDailyReportPdf } from '../../lib/pdfExport';
 import {
   fetchDailyReport,
   fetchDailyReportDates,
@@ -64,16 +65,13 @@ export default function DailyReportPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role === 'admin') {
-      fetchAllTeams()
-        .then((teams) => {
-          setAllTeams(teams);
-          setTeamId((prev) => prev || teams[0]?.id || null);
-        })
-        .catch((err) => setError(err.message));
-    } else {
-      setTeamId(user.teamId || null);
-    }
+    fetchAllTeams()
+      .then((teams) => {
+        setAllTeams(teams);
+        if (user.role === 'admin') setTeamId((prev) => prev || teams[0]?.id || null);
+      })
+      .catch((err) => setError(err.message));
+    if (user.role !== 'admin') setTeamId(user.teamId || null);
   }, [user]);
 
   useEffect(() => {
@@ -182,6 +180,11 @@ export default function DailyReportPage() {
   }
 
   const myRow = !isManager ? rows.find((r) => r.agentId === user?.id) : null;
+  const teamName = allTeams.find((t) => t.id === teamId)?.name || '';
+
+  function handleDownloadPdf() {
+    exportDailyReportPdf({ teamName, date, rows });
+  }
 
   async function handleSaveMyRow() {
     if (!reportId || !myRow) return;
@@ -260,13 +263,22 @@ export default function DailyReportPage() {
               className="px-2.5 py-1.5 bg-surface-alt border border-transparent rounded-lg text-[13px] focus:outline-none focus:border-accent"
             />
             {isManager && (
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="ml-2 bg-accent text-white px-3.5 py-2 rounded-lg font-semibold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
-              >
-                {saving ? 'Saving…' : 'Save report'}
-              </button>
+              <>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={rows.length === 0}
+                  className="px-3.5 py-2 rounded-lg border border-border text-[13px] font-semibold hover:border-accent hover:text-accent transition-colors disabled:opacity-50"
+                >
+                  Download report
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="ml-2 bg-accent text-white px-3.5 py-2 rounded-lg font-semibold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
+                >
+                  {saving ? 'Saving…' : 'Save report'}
+                </button>
+              </>
             )}
             {!isManager && myRow && (
               <button

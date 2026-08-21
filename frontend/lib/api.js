@@ -169,6 +169,11 @@ export async function fetchDailyReportDates(teamId) {
   return data.dates;
 }
 
+export async function fetchReportSummary(teamId, from, to) {
+  const params = new URLSearchParams({ team_id: teamId, from, to });
+  return request(`/api/daily-reports/summary?${params.toString()}`); // { agents, totals, reportCount }
+}
+
 export async function saveDailyReport(payload) {
   const data = await request('/api/daily-reports', { method: 'PUT', body: payload });
   return data.report;

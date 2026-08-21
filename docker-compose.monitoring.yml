@@ -1,0 +1,21 @@
+# Standalone monitoring stack — separate from Dev/Prod app environments.
+# Watches both environments and alerts (Telegram/Email/etc.) when something goes down.
+#
+# Usage:
+#   docker compose -f docker-compose.monitoring.yml -p monitoring up -d
+#   docker compose -f docker-compose.monitoring.yml -p monitoring down
+#
+# Dashboard: http://<your-vm-ip>:3002
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - '3002:3001'
+    volumes:
+      - uptime_kuma_data:/app/data
+
+volumes:
+  uptime_kuma_data:

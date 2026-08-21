@@ -18,6 +18,7 @@ export default function Sidebar({ campaigns = [], activeCampaignTag, onSelectCam
   let items = user?.role === 'agent' ? navItems.filter((i) => i.href !== '/') : navItems;
   if (hasPermission('roles.manage')) items = [...items, { label: 'Roles', href: '/roles' }];
   if (user?.role === 'admin') items = [...items, { label: 'Users', href: '/users' }];
+  if (user?.role !== 'agent') items = [...items, { label: 'Performance', href: '/performance' }];
 
   return (
     <aside className="hidden md:flex flex-col gap-6 w-60 shrink-0 bg-surface border-r border-border p-4">
