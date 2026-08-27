@@ -203,4 +203,14 @@ export async function deleteRole(id) {
   await request(`/api/roles/${id}`, { method: 'DELETE' });
 }
 
+// ---- Report Options (custom Call Target / Attendance dropdown values) ----
+export async function fetchReportOptions(type) {
+  const data = await request(`/api/report-options?type=${encodeURIComponent(type)}`);
+  return data.options;
+}
+
+export async function addReportOption(type, value) {
+  await request('/api/report-options', { method: 'POST', body: { type, value } });
+}
+
 export { ApiError };

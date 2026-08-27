@@ -82,10 +82,8 @@ async function saveReport(req, res) {
           totalLeadsSpova: Number(row.totalLeadsSpova) || 0,
           reason: row.reason || '',
           campaign: row.campaign || '',
-          callTarget: ['on_target', 'underperforming', 'critical'].includes(row.callTarget)
-            ? row.callTarget
-            : 'on_target',
-          attendance: ['present', 'absent'].includes(row.attendance) ? row.attendance : 'present',
+          callTarget: (row.callTarget && String(row.callTarget).trim()) || 'on_target',
+          attendance: (row.attendance && String(row.attendance).trim()) || 'present',
           position: idx,
         })),
       });
@@ -128,11 +126,11 @@ async function updateOwnRow(req, res) {
     reason: reason !== undefined ? reason : undefined,
     campaign: campaign !== undefined ? campaign : undefined,
   };
-  if (callTarget !== undefined && ['on_target', 'underperforming', 'critical'].includes(callTarget)) {
-    data.callTarget = callTarget;
+  if (callTarget !== undefined && String(callTarget).trim()) {
+    data.callTarget = String(callTarget).trim();
   }
-  if (attendance !== undefined && ['present', 'absent'].includes(attendance)) {
-    data.attendance = attendance;
+  if (attendance !== undefined && String(attendance).trim()) {
+    data.attendance = String(attendance).trim();
   }
 
   const updated = await prisma.dailyReportRow.update({ where: { id: rowId }, data });

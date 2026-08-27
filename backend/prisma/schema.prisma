@@ -71,6 +71,7 @@ model User {
   leadOfTeam  Team?  @relation("TeamLead")
   customRole  Role?  @relation("UserCustomRole", fields: [customRoleId], references: [id], onDelete: SetNull)
   createdRoles  Role[]          @relation("RoleCreator")
+  createdReportOptions ReportOption[]
   importBatches ImportBatch[]
   dailyReportRows DailyReportRow[]
 
@@ -116,24 +117,13 @@ model ImportBatch {
   errorLog     Json?    @map("error_log")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@map("import_batches")
 }
 
 // Mirrors the "Team Daily Report" spreadsheet: one report per team per calendar
 // date, containing one row per agent with hourly FTD/Fresh-Lead entries.
-enum CallTarget {
-  on_target
-  underperforming
-  critical
-}
-
-enum Attendance {
-  present
-  absent
-}
-
 model DailyReport {
   id        String   @id @default(uuid())
   date      DateTime @db.Date
@@ -149,18 +139,19 @@ model DailyReport {
 }
 
 model DailyReportRow {
-  id                String     @id @default(uuid())
-  reportId          String     @map("report_id")
-  agentId           String?    @map("agent_id")
-  agentName         String     @map("agent_name")
-  totalFtds         Int        @default(0) @map("total_ftds")
-  totalLeadsFintana Int        @default(0) @map("total_leads_fintana")
-  totalLeadsSpova   Int        @default(0) @map("total_leads_spova")
-  reason            String     @default("")
-  campaign          String     @default("")
-  callTarget        CallTarget @default(on_target) @map("call_target")
-  attendance        Attendance @default(present)
-  position          Int        @default(0)
+  id                String  @id @default(uuid())
+  reportId          String  @map("report_id")
+  agentId           String? @map("agent_id")
+  agentName         String  @map("agent_name")
+  totalFtds         Int     @default(0) @map("total_ftds")
+  totalLeadsFintana Int     @default(0) @map("total_leads_fintana")
+  totalLeadsSpova   Int     @default(0) @map("total_leads_spova")
+  reason            String  @default("")
+  campaign          String  @default("")
+  // Free text now (not a fixed enum) — team leads can add new options via /api/report-options.
+  callTarget        String  @default("on_target") @map("call_target")
+  attendance        String  @default("present")
+  position          Int     @default(0)
 
   report DailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   agent  User?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
@@ -168,4 +159,19 @@ model DailyReportRow {
   @@index([reportId])
   @@index([agentId])
   @@map("daily_report_rows")
+}
+
+// Custom dropdown values a team lead has added for Call Target / Attendance,
+// on top of the built-in defaults (on_target/underperforming/critical, present/absent).
+model ReportOption {
+  id          String   @id @default(uuid())
+  type        String // "call_target" | "attendance"
+  value       String
+  createdById String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([type, value])
+  @@map("report_options")
 }

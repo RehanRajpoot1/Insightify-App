@@ -15,6 +15,8 @@ import {
   updateDailyReportRow,
   fetchAllTeams,
   fetchAgentsByTeam,
+  fetchReportOptions,
+  addReportOption,
   ApiError,
 } from '../../lib/api';
 
@@ -58,6 +60,30 @@ export default function DailyReportPage() {
   // Admin picks which team's report to view; team_lead/agent are pinned to their own team.
   const [allTeams, setAllTeams] = useState([]);
   const [teamId, setTeamId] = useState(null);
+  const [callTargetOptions, setCallTargetOptions] = useState([]);
+  const [attendanceOptions, setAttendanceOptions] = useState([]);
+
+  useEffect(() => {
+    fetchReportOptions('call_target').then(setCallTargetOptions).catch(() => {});
+    fetchReportOptions('attendance').then(setAttendanceOptions).catch(() => {});
+  }, []);
+
+  async function handleAddOption(type) {
+    const label = type === 'call_target' ? 'Call Target' : 'Attendance';
+    const value = window.prompt(`Enter new ${label} option:`);
+    if (!value || !value.trim()) return null;
+    const trimmed = value.trim();
+    try {
+      await addReportOption(type, trimmed);
+      const updated = await fetchReportOptions(type);
+      if (type === 'call_target') setCallTargetOptions(updated);
+      else setAttendanceOptions(updated);
+      return trimmed;
+    } catch (err) {
+      window.alert(err instanceof ApiError ? err.message : `Failed to add ${label} option`);
+      return null;
+    }
+  }
 
   useEffect(() => {
     if (!authLoading && !user) router.replace('/login');
@@ -336,6 +362,9 @@ export default function DailyReportPage() {
                 onChangeRow={updateRow}
                 onRemoveRow={removeRow}
                 editableRowId={isManager ? undefined : myRow?.id ?? '__none__'}
+                callTargetOptions={callTargetOptions}
+                attendanceOptions={attendanceOptions}
+                onAddOption={isManager ? handleAddOption : undefined}
               />
               {isManager && (
                 <div className="flex gap-2 mt-3">

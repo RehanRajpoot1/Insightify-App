@@ -9,24 +9,37 @@ const textCls =
 const selectCls =
   'text-[11.5px] font-semibold px-2 py-1 rounded-md border-none focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer';
 
-const CALL_TARGET_OPTIONS = [
-  { value: 'on_target', label: 'On Target', cls: 'bg-success-soft text-success' },
-  { value: 'underperforming', label: 'Underperforming', cls: 'bg-warning-soft text-warning' },
-  { value: 'critical', label: 'Critical', cls: 'bg-danger text-white' },
-];
-
-const ATTENDANCE_OPTIONS = [
-  { value: 'present', label: 'Present', cls: 'bg-success-soft text-success' },
-  { value: 'absent', label: 'Absent', cls: 'bg-danger text-white' },
-];
+const ADD_NEW = '__add_new__';
 
 function totalLeads(row) {
   return (Number(row.totalLeadsFintana) || 0) + (Number(row.totalLeadsSpova) || 0);
 }
 
+// Known built-in values get a meaningful color; anything a team lead has typed
+// in fresh gets a neutral accent color since we don't know its intended meaning.
+function targetColorCls(value) {
+  if (value === 'on_target') return 'bg-success-soft text-success';
+  if (value === 'underperforming') return 'bg-warning-soft text-warning';
+  if (value === 'critical') return 'bg-danger text-white';
+  return 'bg-accent-soft text-accent';
+}
+function attendanceColorCls(value) {
+  if (value === 'present') return 'bg-success-soft text-success';
+  if (value === 'absent') return 'bg-danger text-white';
+  return 'bg-accent-soft text-accent';
+}
+
 // If `editableRowId` is set, every row EXCEPT that one is fully locked (agent view).
 // If not set, everyone with write access can edit every row (admin/team_lead view).
-export default function DailyReportTable({ rows, onChangeRow, onRemoveRow, editableRowId }) {
+export default function DailyReportTable({
+  rows,
+  onChangeRow,
+  onRemoveRow,
+  editableRowId,
+  callTargetOptions = [],
+  attendanceOptions = [],
+  onAddOption, // async (type) => newValue | null — only called for admin/team_lead
+}) {
   const restrictedMode = editableRowId !== undefined;
 
   const teamTotals = {
@@ -35,6 +48,15 @@ export default function DailyReportTable({ rows, onChangeRow, onRemoveRow, edita
     totalLeadsSpova: rows.reduce((sum, r) => sum + (Number(r.totalLeadsSpova) || 0), 0),
     totalLeads: rows.reduce((sum, r) => sum + totalLeads(r), 0),
   };
+
+  async function handleSelectChange(rowIdx, row, field, type, value) {
+    if (value === ADD_NEW) {
+      const newValue = await onAddOption?.(type);
+      if (newValue) onChangeRow(rowIdx, { ...row, [field]: newValue });
+      return;
+    }
+    onChangeRow(rowIdx, { ...row, [field]: value });
+  }
 
   return (
     <div className="overflow-x-auto border border-border rounded-lg">
@@ -75,8 +97,8 @@ export default function DailyReportTable({ rows, onChangeRow, onRemoveRow, edita
           {rows.map((row, rowIdx) => {
             const rowLocked = restrictedMode && row.id !== editableRowId;
             const isMine = restrictedMode && row.id === editableRowId;
-            const targetMeta = CALL_TARGET_OPTIONS.find((o) => o.value === row.callTarget) || CALL_TARGET_OPTIONS[0];
-            const attMeta = ATTENDANCE_OPTIONS.find((o) => o.value === row.attendance) || ATTENDANCE_OPTIONS[0];
+            const target = row.callTarget || 'on_target';
+            const attendance = row.attendance || 'present';
             return (
               <tr key={row.id} className={`hover:bg-surface-alt/50 ${isMine ? 'bg-accent-soft/20' : ''}`}>
                 <td className="sticky left-0 bg-surface border-b border-r border-border px-2 py-1.5">
@@ -142,30 +164,38 @@ export default function DailyReportTable({ rows, onChangeRow, onRemoveRow, edita
                 </td>
                 <td className="border-b border-r border-border px-1.5 py-1.5 text-center">
                   <select
-                    value={row.callTarget || 'on_target'}
+                    value={target}
                     disabled={rowLocked}
-                    onChange={(e) => onChangeRow(rowIdx, { ...row, callTarget: e.target.value })}
-                    className={`${selectCls} ${targetMeta.cls}`}
+                    onChange={(e) => handleSelectChange(rowIdx, row, 'callTarget', 'call_target', e.target.value)}
+                    className={`${selectCls} ${targetColorCls(target)}`}
                   >
-                    {CALL_TARGET_OPTIONS.map((o) => (
+                    {!callTargetOptions.some((o) => o.value === target) && (
+                      <option value={target}>{target}</option>
+                    )}
+                    {callTargetOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
+                    {!restrictedMode && <option value={ADD_NEW}>+ Add new…</option>}
                   </select>
                 </td>
                 <td className="border-b border-border px-1.5 py-1.5 text-center">
                   <select
-                    value={row.attendance || 'present'}
+                    value={attendance}
                     disabled={rowLocked}
-                    onChange={(e) => onChangeRow(rowIdx, { ...row, attendance: e.target.value })}
-                    className={`${selectCls} ${attMeta.cls}`}
+                    onChange={(e) => handleSelectChange(rowIdx, row, 'attendance', 'attendance', e.target.value)}
+                    className={`${selectCls} ${attendanceColorCls(attendance)}`}
                   >
-                    {ATTENDANCE_OPTIONS.map((o) => (
+                    {!attendanceOptions.some((o) => o.value === attendance) && (
+                      <option value={attendance}>{attendance}</option>
+                    )}
+                    {attendanceOptions.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
                       </option>
                     ))}
+                    {!restrictedMode && <option value={ADD_NEW}>+ Add new…</option>}
                   </select>
                 </td>
                 {!restrictedMode && (

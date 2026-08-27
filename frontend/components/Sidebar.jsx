@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
 import { roleLabel } from '../lib/utils';
+import ThemeToggle from './ThemeToggle';
 
 const navItems = [
   { label: 'Teams', href: '/' },
@@ -22,11 +23,14 @@ export default function Sidebar({ campaigns = [], activeCampaignTag, onSelectCam
 
   return (
     <aside className="hidden md:flex flex-col gap-6 w-60 shrink-0 bg-surface border-r border-border p-4">
-      <div className="flex items-center gap-2 px-2">
-        <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white font-extrabold text-xs">
-          R
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white font-extrabold text-xs">
+            R
+          </div>
+          <span className="font-bold text-[15px] tracking-tight">Insightify</span>
         </div>
-        <span className="font-bold text-[15px] tracking-tight">Insightify</span>
+        <ThemeToggle />
       </div>
 
       <nav>
