@@ -213,4 +213,10 @@ export async function addReportOption(type, value) {
   await request('/api/report-options', { method: 'POST', body: { type, value } });
 }
 
+// ---- Dashboard ----
+export async function fetchDashboardData(teamId, from, to) {
+  const params = new URLSearchParams({ team_id: teamId || 'all', from, to });
+  return request(`/api/daily-reports/dashboard?${params.toString()}`); // { kpis, trend, attendance, callTarget }
+}
+
 export { ApiError };

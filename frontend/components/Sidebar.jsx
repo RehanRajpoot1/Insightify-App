@@ -17,6 +17,7 @@ export default function Sidebar({ campaigns = [], activeCampaignTag, onSelectCam
 
   // Agents only get the Daily Report tab — they don't manage teams/rosters.
   let items = user?.role === 'agent' ? navItems.filter((i) => i.href !== '/') : navItems;
+  if (user?.role !== 'agent') items = [{ label: 'Dashboard', href: '/dashboard' }, ...items];
   if (hasPermission('roles.manage')) items = [...items, { label: 'Roles', href: '/roles' }];
   if (user?.role === 'admin') items = [...items, { label: 'Users', href: '/users' }];
   if (user?.role !== 'agent') items = [...items, { label: 'Performance', href: '/performance' }];

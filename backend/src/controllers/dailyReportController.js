@@ -190,4 +190,77 @@ async function getReportSummary(req, res) {
   res.json({ agents, totals, reportCount: reports.length });
 }
 
-module.exports = { getReportByDate, listReportDates, saveReport, updateOwnRow, getReportSummary };
+// GET /api/daily-reports/dashboard?team_id=all|<id>&from=YYYY-MM-DD&to=YYYY-MM-DD
+// Admin may pass team_id=all (or omit it) to aggregate across every team.
+async function getDashboardData(req, res) {
+  if (req.user.role === 'agent') return res.status(403).json({ error: 'Forbidden' });
+
+  const from = toDateOnly(req.query.from);
+  const to = toDateOnly(req.query.to);
+  if (!from || !to) return res.status(400).json({ error: 'Valid from and to dates are required' });
+
+  let teamId;
+  if (req.user.role === 'admin') {
+    teamId = req.query.team_id && req.query.team_id !== 'all' ? req.query.team_id : null;
+  } else {
+    teamId = req.user.teamId;
+    if (!teamId) return res.status(400).json({ error: 'You are not assigned to a team' });
+  }
+
+  const where = { date: { gte: from, lte: to } };
+  if (teamId) where.teamId = teamId;
+
+  const reports = await prisma.dailyReport.findMany({
+    where,
+    include: { rows: true },
+    orderBy: { date: 'asc' },
+  });
+
+  const trendMap = new Map();
+  const attendanceCounts = {};
+  const targetCounts = {};
+  const agentSet = new Set();
+  let totalFtds = 0;
+  let totalLeadsFintana = 0;
+  let totalLeadsSpova = 0;
+
+  for (const report of reports) {
+    const dateKey = report.date.toISOString().slice(0, 10);
+    if (!trendMap.has(dateKey)) trendMap.set(dateKey, { date: dateKey, ftds: 0, leads: 0 });
+    const trendEntry = trendMap.get(dateKey);
+
+    for (const row of report.rows) {
+      const leads = row.totalLeadsFintana + row.totalLeadsSpova;
+      totalFtds += row.totalFtds;
+      totalLeadsFintana += row.totalLeadsFintana;
+      totalLeadsSpova += row.totalLeadsSpova;
+      trendEntry.ftds += row.totalFtds;
+      trendEntry.leads += leads;
+
+      attendanceCounts[row.attendance] = (attendanceCounts[row.attendance] || 0) + 1;
+      targetCounts[row.callTarget] = (targetCounts[row.callTarget] || 0) + 1;
+      agentSet.add(row.agentId || `name:${row.agentName}`);
+    }
+  }
+
+  const totalLeads = totalLeadsFintana + totalLeadsSpova;
+  const conversionRate = totalLeads > 0 ? (totalFtds / totalLeads) * 100 : 0;
+  const trend = [...trendMap.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  res.json({
+    kpis: {
+      totalFtds,
+      totalLeads,
+      totalLeadsFintana,
+      totalLeadsSpova,
+      conversionRate,
+      activeAgents: agentSet.size,
+      totalReports: reports.length,
+    },
+    trend,
+    attendance: attendanceCounts,
+    callTarget: targetCounts,
+  });
+}
+
+module.exports = { getReportByDate, listReportDates, saveReport, updateOwnRow, getReportSummary, getDashboardData };
