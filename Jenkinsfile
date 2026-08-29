@@ -34,6 +34,23 @@ pipeline {
             }
         }
 
+        stage('Code Quality Scan - DEV') {
+            when { branch 'develop' }
+            steps {
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    sh '''
+                        echo "===== SonarQube code quality scan (DEV) ====="
+                        docker run --rm \
+                          -v "$PWD:/usr/src" \
+                          -w /usr/src \
+                          sonarsource/sonar-scanner-cli \
+                          -Dsonar.host.url=http://192.168.2.60:9000 \
+                          -Dsonar.token=$SONAR_TOKEN || true
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to DEV') {
             when { branch 'develop' }
             steps {
